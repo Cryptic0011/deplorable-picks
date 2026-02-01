@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       ...(isUpgrade ? {} : {
         cancel_at_period_end: false,
       }),
-    }) as Stripe.Subscription
+    })
 
     // If downgrade, we need to schedule it differently
     if (!isUpgrade) {
@@ -105,10 +105,7 @@ export async function POST(request: NextRequest) {
       message: isUpgrade
         ? 'Subscription upgraded! You have been charged the prorated difference.'
         : 'Subscription will be downgraded at the end of your current billing period.',
-      subscription: {
-        id: updatedSubscription.id,
-        currentPeriodEnd: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
-      },
+      subscriptionId: updatedSubscription.id,
     })
   } catch (error) {
     console.error('Update subscription error:', error)
