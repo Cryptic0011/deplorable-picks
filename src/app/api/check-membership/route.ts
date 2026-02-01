@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ isMember: data.isMember ?? false })
   } catch (error) {
-    console.error('Membership check error:', error)
-    // Graceful degradation - assume member if check fails
+    // Bot not running - this is expected during local development
+    console.log('Bot API unavailable, skipping membership check (assuming member)')
     return NextResponse.json({ isMember: true })
   }
 }

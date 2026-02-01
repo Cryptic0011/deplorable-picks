@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       ...(isUpgrade ? {} : {
         cancel_at_period_end: false,
       }),
-    })
+    }) as Stripe.Subscription
 
     // If downgrade, we need to schedule it differently
     if (!isUpgrade) {
