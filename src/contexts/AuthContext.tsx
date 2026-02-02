@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types/database'
 
@@ -24,7 +24,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
   const initializedRef = useRef(false)
+  const codeExchangeAttemptedRef = useRef(false)
 
   const supabase = createClient()
 
@@ -48,6 +51,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(profileData)
     }
   }, [user, fetchProfile])
+
+  // Handle OAuth code exchange when code appears in URL (fallback for when
+  // Supabase redirects to a page other than /auth/callback)
+  useEffect(() => {
+    const code = searchParams.get('code')
+
+    // Skip if no code, already attempted, or we're on the callback route (handled server-side)
+    if (!code || codeExchangeAttemptedRef.current || pathname === '/auth/callback') {
+      return
+    }
+
+    codeExchangeAttemptedRef.current = true
+
+    const exchangeCodeAndRedirect = async () => {
+      try {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+        if (error) {
+          console.error('Error exchanging code for session:', error)
+          // Clean up the URL even on error
+          router.replace(pathname)
+          return
+        }
+
+        // Successfully exchanged code - redirect to dashboard
+        // The auth state listener will update the UI
+        router.replace('/dashboard')
+      } catch (err) {
+        console.error('Failed to exchange code:', err)
+        router.replace(pathname)
+      }
+    }
+
+    exchangeCodeAndRedirect()
+  }, [searchParams, pathname, supabase, router])
 
   useEffect(() => {
     // Set up auth state listener FIRST to catch the INITIAL_SESSION event
