@@ -1,7 +1,8 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { User, Session } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types/database'
 
@@ -22,6 +23,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const initializedRef = useRef(false)
 
   const supabase = createClient()
 
@@ -47,42 +50,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, fetchProfile])
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (session?.user) {
-        setUser(session.user)
-        setSession(session)
-        const profileData = await fetchProfile(session.user.id)
-        setProfile(profileData)
-      }
-      setLoading(false)
-    }
-
-    initializeAuth()
-
+    // Set up auth state listener FIRST to catch the INITIAL_SESSION event
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
+      async (event, currentSession) => {
+        // Update state with current session info
+        setSession(currentSession)
+        setUser(currentSession?.user ?? null)
 
-        if (session?.user) {
-          const profileData = await fetchProfile(session.user.id)
+        if (currentSession?.user) {
+          const profileData = await fetchProfile(currentSession.user.id)
           setProfile(profileData)
         } else {
           setProfile(null)
         }
 
+        // Handle specific events
         if (event === 'SIGNED_OUT') {
           setProfile(null)
+        }
+
+        // When user signs in (e.g., after OAuth callback), refresh the router
+        // to ensure Next.js server components are in sync with the new session
+        if (event === 'SIGNED_IN' && initializedRef.current) {
+          router.refresh()
+        }
+
+        // Mark loading as complete after receiving INITIAL_SESSION event
+        // This ensures we don't show stale UI before auth state is determined
+        if (event === 'INITIAL_SESSION') {
+          initializedRef.current = true
+          setLoading(false)
         }
       }
     )
 
+    // Fallback: if INITIAL_SESSION doesn't fire within 2 seconds, set loading to false
+    // This prevents the UI from being stuck in loading state if something goes wrong
+    const timeoutId = setTimeout(() => {
+      if (!initializedRef.current) {
+        initializedRef.current = true
+        setLoading(false)
+      }
+    }, 2000)
+
     return () => {
       subscription.unsubscribe()
+      clearTimeout(timeoutId)
     }
-  }, [supabase, fetchProfile])
+  }, [supabase, fetchProfile, router])
 
   const signInWithDiscord = async () => {
     const redirectUrl = `${window.location.origin}/auth/callback`
