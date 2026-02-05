@@ -6,6 +6,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Star, Quote } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Review } from '@/types/database'
+import Image from 'next/image'
 
 export function Reviews() {
   const [reviews, setReviews] = useState<Review[]>([])
@@ -93,7 +94,28 @@ export function Reviews() {
         ) : (
           <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {displayReviews.map((review) => (
-              <Card key={review.id} hover className="relative">
+              <Card key={review.id} hover className="relative overflow-hidden">
+                {/* Images */}
+                {review.image_urls && review.image_urls.length > 0 && (
+                  <div className="grid grid-cols-2 gap-1">
+                    {review.image_urls.slice(0, 4).map((url, index) => (
+                      <div key={index} className="relative aspect-square">
+                        <Image
+                          src={url}
+                          alt={`Review image ${index + 1}`}
+                          fill
+                          className="object-cover"
+                        />
+                        {index === 3 && review.image_urls.length > 4 && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                            <span className="text-lg font-bold text-white">+{review.image_urls.length - 4}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <CardContent className="pt-6">
                   {/* Quote Icon */}
                   <Quote className="absolute right-4 top-4 h-8 w-8 text-[hsl(var(--primary))/0.2]" />
@@ -106,9 +128,11 @@ export function Reviews() {
                   </div>
 
                   {/* Content */}
-                  <p className="mb-6 text-[hsl(var(--muted-foreground))]">
-                    &ldquo;{review.content}&rdquo;
-                  </p>
+                  {review.content && (
+                    <p className="mb-6 text-[hsl(var(--muted-foreground))]">
+                      &ldquo;{review.content}&rdquo;
+                    </p>
+                  )}
 
                   {/* Author */}
                   <div className="flex items-center gap-3">
